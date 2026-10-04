@@ -92,8 +92,16 @@ public static async Task<Process> LaunchGame(string path, string[] args, bool no
             process.StartInfo.Environment["OPENSSL_ia32cap"] = "~0x20000000"; // Fix for the 64bit clients not working on 10th Gen and 11th Gen Intel CPUs
         }
 
-        foreach (var arg in args)
+        for (var index = 0; index < args.Length; index++)
         {
+            var arg = args[index];
+            // Instance-owned user data must also be respected with custom launch arguments.
+            if (homedir != null && arg.StartsWith("-homedir=", StringComparison.OrdinalIgnoreCase)) continue;
+            if (homedir != null && arg.Equals("-homedir", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 < args.Length) index++;
+                continue;
+            }
             process.StartInfo.ArgumentList.Add(arg);
         }
 
@@ -109,9 +117,10 @@ public static async Task<Process> LaunchGame(string path, string[] args, bool no
                 process.StartInfo.ArgumentList.Add("-nosplash");
                 process.StartInfo.ArgumentList.Add("-windowed");
             }
-            homedir ??= "Tempest";
-            process.StartInfo.ArgumentList.Add($"-homedir={homedir}");
         }
+
+        if (defaultArgs || homedir != null)
+            process.StartInfo.ArgumentList.Add($"-homedir={homedir ?? "Tempest"}");
 
         if (gamescope)
         {
