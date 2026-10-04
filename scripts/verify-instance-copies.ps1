@@ -49,13 +49,12 @@ try {
     $targetCache = Join-Path $sandbox 'TargetCache'
     New-Item -ItemType Directory -Path $sourceCache | Out-Null
     [IO.File]::WriteAllText((Join-Path $sourceCache 'assembly.db'), 'cached assembly')
-    $result = (Invoke-Cli @('instance','clone',$original,'--output',$copy,'--from-home',$sourceHomeName,'--to-home',$targetHomeName,'--from-cache',$sourceCache,'--to-cache',$targetCache)) | ConvertFrom-Json
+    $result = (Invoke-Cli @('instance','clone',$original,'--output',$copy,'--from-cache',$sourceCache,'--to-cache',$targetCache)) | ConvertFrom-Json
     [IO.File]::WriteAllText((Join-Path $sourceCache 'assembly.db'), 'updated assembly')
     Assert ((Get-Content -LiteralPath (Join-Path $targetCache 'assembly.db') -Raw) -eq 'cached assembly') 'Copied instance cache was linked or missing'
     Assert ($result.Output -eq $copy) 'Clone returned wrong destination'
-    Assert ((Get-Content -LiteralPath (Join-Path $targetHome 'settings.ini') -Raw) -eq 'same preferences') 'User settings were not copied'
-    [IO.File]::WriteAllText((Join-Path $sourceHome 'settings.ini'), 'updated preferences')
-    Assert ((Get-Content -LiteralPath (Join-Path $targetHome 'settings.ini') -Raw) -eq 'same preferences') 'Copied user settings were linked'
+    Assert (!(Test-Path -LiteralPath $targetHome)) 'Clone created an isolated config folder'
+    Assert ((Get-Content -LiteralPath (Join-Path $sourceHome 'settings.ini') -Raw) -eq 'same preferences') 'Clone changed user settings'
     $pathsJson = ConvertTo-Json -InputObject @($original,(Join-Path $original 'Binaries\Win64\Paladins.exe'),$copy) -Compress
     $encodedPaths = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pathsJson))
     $roots = (Invoke-Cli @('instance','roots',$encodedPaths)) | ConvertFrom-Json
@@ -86,6 +85,9 @@ try {
         Assert (!(Get-ChildItem -LiteralPath $sandbox -Filter 'Failed.copy-*')) 'Failed clone left a staging folder'
     } finally { [IO.Directory]::Delete($junction) }
     $registry = Join-Path $sandbox 'cleanup.json'
+    # Legacy isolated configs remain eligible for cleanup; shared configs stay untouched.
+    New-Item -ItemType Directory -Path $targetHome | Out-Null
+    [IO.File]::WriteAllText((Join-Path $targetHome 'settings.ini'), 'legacy isolated preferences')
     @{version=1;instances=@(@{id=$copyId;label='Copy';path=$copy;origin='import';userDataDir=$targetHomeName})} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $registry -Encoding UTF8
     Invoke-Cli @('cleanup','run','--manifest',$registry,'--confirm','--launcher-session') | Out-Null
     Assert (!(Test-Path -LiteralPath $targetHome) -and (Test-Path -LiteralPath $sourceHome)) 'Cleanup removed the wrong user-data folder'

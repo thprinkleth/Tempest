@@ -43,7 +43,7 @@ export async function copyInstance(
 			path: copy.Output,
 			managedPath: copy.Output,
 			origin: "copy",
-			userDataDir: `Tempest_${id}`,
+			userDataDir: undefined,
 			launchOptions: relocateLaunchOptions(source.launchOptions, copy.Source, copy.Output),
 			state: { type: "prepared" },
 		};

@@ -19,7 +19,7 @@ let pid = 100, closeBeforeSpawn = false, failedWritePid = 0;
 const setting = { get: () => undefined };
 globalThis.__sessionTest = {
 	instanceMap: { value: { a, b } }, lastLaunchedInstanceId: { value: undefined }, processesList, launchingInstanceIds,
-	instanceStorage: { copying: [] }, prepareIndependentInstances: async () => {}, instanceHome: (i) => `Tempest_${i.id}`,
+	instanceStorage: { copying: [] }, prepareIndependentInstances: async () => {},
 	appendProcessLog: () => {}, logCommandOutput: () => {}, processArgs: (args) => args,
 	gamescopeArgs: setting, protonPath: setting, useGamescope: setting, useSteamRuntime: setting, winePath: setting, wineRuntime: setting,
 	createCommand: () => {
@@ -32,7 +32,7 @@ globalThis.__sessionTest = {
 };
 try {
 	await mkdir(dirname(fixture), { recursive: true });
-	await writeFile(fixture, `const {instanceMap,lastLaunchedInstanceId,appendProcessLog,launchingInstanceIds,logCommandOutput,processesList,gamescopeArgs,protonPath,useGamescope,useSteamRuntime,winePath,wineRuntime,createCommand,processArgs,instanceHome,instanceStorage,prepareIndependentInstances}=globalThis.__sessionTest;\n` + js);
+	await writeFile(fixture, `const {instanceMap,lastLaunchedInstanceId,appendProcessLog,launchingInstanceIds,logCommandOutput,processesList,gamescopeArgs,protonPath,useGamescope,useSteamRuntime,winePath,wineRuntime,createCommand,processArgs,instanceStorage,prepareIndependentInstances}=globalThis.__sessionTest;\n` + js);
 	const { launchGame, killGame, stopGameSession } = await import(pathToFileURL(fixture));
 	await launchGame(a); await launchGame(a); await launchGame(b);
 	assert.equal(processesList.value.length, 3);

@@ -22,15 +22,6 @@ const normalized = (path: string) => {
 	const value = path.replaceAll("\\", "/").replace(/\/+$/, "");
 	return platform() === "windows" ? value.toLowerCase() : value;
 };
-export const instanceHome = (instance: Instance) =>
-	instance.userDataDir ?? `Tempest_${instance.id}`;
-export const legacyHome = (instance: Instance) =>
-	instance.version === "8.1"
-		? "Paladins"
-		: `${instance.version ? `${instance.version}_` : ""}${instance.label}`.replaceAll(
-				/[^a-zA-Z0-9-_]/g,
-				"_",
-			);
 
 async function execute(args: Parameters<typeof createCommand>[0]): Promise<string> {
 	const result = await createCommand(args).execute();
@@ -65,7 +56,6 @@ export async function cloneInstanceFiles(
 	instance: Instance,
 	id: string,
 	target: string,
-	copyHome = true,
 ): Promise<{ Source: string; Output: string }> {
 	const output = await execute([
 		"instance",
@@ -73,8 +63,6 @@ export async function cloneInstanceFiles(
 		instance.path,
 		{
 			"--output": target,
-			"--from-home": copyHome ? (instance.userDataDir ?? legacyHome(instance)) : undefined,
-			"--to-home": copyHome ? `Tempest_${id}` : undefined,
 			"--from-cache": id !== instance.id ? await getInstanceBasePath(instance.id) : undefined,
 			"--to-cache": id !== instance.id ? await getInstanceBasePath(id) : undefined,
 		},
@@ -85,7 +73,7 @@ export async function cloneInstanceFiles(
 export function prepareIndependentInstances(): Promise<void> {
 	if (pending) return pending;
 	const instances = Object.values(instanceMap.value).filter((i): i is Instance => !!i);
-	const signature = JSON.stringify(instances.map((i) => [i.id, i.path, i.userDataDir]));
+	const signature = JSON.stringify(instances.map((i) => [i.id, i.path]));
 	if (signature === preparedSignature && instanceStorage.ready) return Promise.resolve();
 	instanceStorage.busy = true;
 	instanceStorage.error = "";
@@ -96,7 +84,7 @@ export function prepareIndependentInstances(): Promise<void> {
 			const encodedPaths = btoa(
 				Array.from(pathBytes, (byte) => String.fromCharCode(byte)).join(""),
 			);
-			const expected: [string, string, string][] = [];
+			const expected: [string, string][] = [];
 			const roots = batch.length
 				? (JSON.parse(await execute(["instance", "roots", encodedPaths])) as string[])
 				: [];
@@ -123,17 +111,11 @@ export function prepareIndependentInstances(): Promise<void> {
 						);
 					}
 					const target = await instanceDestination(instance.version, crypto.randomUUID());
-					const copy = await cloneInstanceFiles(
-						instance,
-						instance.id,
-						target,
-						!instance.userDataDir,
-					);
+					const copy = await cloneInstanceFiles(instance, instance.id, target);
 					updateInstance(instance.id, {
 						path: copy.Output,
 						managedPath: copy.Output,
 						origin: "copy",
-						userDataDir: `Tempest_${instance.id}`,
 						launchOptions: relocateLaunchOptions(
 							instance.launchOptions,
 							copy.Source,
@@ -159,23 +141,13 @@ export function prepareIndependentInstances(): Promise<void> {
 						];
 					}
 					instance = instanceMap.value[instance.id]!;
-				} else if (instance.userDataDir !== `Tempest_${instance.id}`) {
-					await execute([
-						"instance",
-						"prepare-home",
-						{
-							"--from": instance.userDataDir ?? legacyHome(instance),
-							"--name": `Tempest_${instance.id}`,
-						},
-					]);
-					updateInstance(instance.id, { userDataDir: `Tempest_${instance.id}` });
 				}
 				seen.add(normalized(root));
 				await allowScopeDirectory(instance.path, true);
-				expected.push([instance.id, instance.path, `Tempest_${instance.id}`]);
+				expected.push([instance.id, instance.path]);
 			}
 			batch = Object.values(instanceMap.value).filter((i): i is Instance => !!i);
-			const current = JSON.stringify(batch.map((i) => [i.id, i.path, i.userDataDir]));
+			const current = JSON.stringify(batch.map((i) => [i.id, i.path]));
 			if (current !== JSON.stringify(expected)) continue;
 			preparedSignature = current;
 			instanceStorage.ready = true;

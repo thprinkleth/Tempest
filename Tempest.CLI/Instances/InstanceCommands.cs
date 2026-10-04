@@ -19,17 +19,13 @@ internal class InstanceCommands
     /// <summary>Copies game files, installed mods and backups into an independent instance</summary>
     /// <param name="path">Source instance folder</param>
     /// <param name="output">New destination folder; must not exist</param>
-    /// <param name="fromHome">Optional source game user-data folder name</param>
-    /// <param name="toHome">Optional new game user-data folder name</param>
     /// <param name="fromCache">Optional source instance cache directory</param>
     /// <param name="toCache">Optional new instance cache directory</param>
-    public void Clone([Argument] string path, string output, string? fromHome = null, string? toHome = null, string? fromCache = null, string? toCache = null)
+    public void Clone([Argument] string path, string output, string? fromCache = null, string? toCache = null)
     {
         string? stage = null;
-        string? homeStage = null;
         string? cacheStage = null;
         var committed = new List<string>();
-        string? homeTarget = null;
         try
         {
             var source = GameFolderResolver.Resolve(Path.GetFullPath(path)).TrimEnd(Path.DirectorySeparatorChar);
@@ -52,13 +48,6 @@ internal class InstanceCommands
             stage = StageCopy(source, output);
             if (File.Exists(metadata))
                 File.WriteAllText(Path.Combine(stage, ".tempest", "mods", "mods.json"), JsonSerializer.Serialize(mods, ModSourceGenerationContext.Default.ListModRecord));
-            if (fromHome != null || toHome != null)
-            {
-                if (fromHome == null || toHome == null) throw new ArgumentException("Both user-data folder names are required.");
-                homeTarget = HomePath(toHome);
-                ValidateDestination(HomePath(fromHome), homeTarget);
-                homeStage = StageCopy(HomePath(fromHome), homeTarget, allowMissing: true);
-            }
             if (fromCache != null || toCache != null)
             {
                 if (fromCache == null || toCache == null) throw new ArgumentException("Both cache directories are required.");
@@ -70,12 +59,6 @@ internal class InstanceCommands
             Directory.Move(stage, output);
             stage = null;
             committed.Add(output);
-            if (homeStage != null)
-            {
-                Directory.Move(homeStage, homeTarget!);
-                homeStage = null;
-                committed.Add(homeTarget!);
-            }
             if (cacheStage != null)
             {
                 Directory.Move(cacheStage, toCache!);
@@ -92,21 +75,8 @@ internal class InstanceCommands
         finally
         {
             if (stage != null) DeleteOwnedTree(stage);
-            if (homeStage != null) DeleteOwnedTree(homeStage);
             if (cacheStage != null) DeleteOwnedTree(cacheStage);
         }
-    }
-
-    /// <summary>Seeds a unique instance user-data folder without changing the original</summary>
-    public void PrepareHome(string from, string name)
-    {
-        var target = HomePath(name);
-        if (Directory.Exists(target)) return;
-        var source = HomePath(from);
-        ValidateDestination(source, target);
-        var stage = StageCopy(source, target, allowMissing: true);
-        try { Directory.Move(stage, target); }
-        finally { if (Directory.Exists(stage)) DeleteOwnedTree(stage); }
     }
 
     internal static string ResolveRoot(string path)

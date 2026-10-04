@@ -36,6 +36,7 @@ export type Instance = {
 	appId?: number;
 	path: string;
 	origin?: "download" | "import" | "copy";
+	/** Legacy isolated config folder, retained only for uninstall cleanup. */
 	userDataDir?: string;
 	/** Exact download destination; changing the instance path never transfers ownership. */
 	managedPath?: string;
