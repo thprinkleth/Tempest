@@ -3,6 +3,7 @@
 	import { page } from "$app/state";
 	import {
 		BookOpen,
+		Copy,
 		EllipsisVertical,
 		FolderOpen,
 		PackageOpen,
@@ -13,6 +14,7 @@
 	} from "@lucide/svelte";
 	import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 	import { platform } from "@tauri-apps/plugin-os";
+	import CopyInstanceDialog from "$lib/components/library/CopyInstanceDialog.svelte";
 	import DeleteInstanceDialog from "$lib/components/library/DeleteInstanceDialog.svelte";
 	import PopoverMenu from "$lib/components/ui/PopoverMenu.svelte";
 	import PopoverMenuItem from "$lib/components/ui/PopoverMenuItem.svelte";
@@ -57,6 +59,7 @@
 	const { installMods: handleInstallMod } = useInstallMods(() => instance.path);
 
 	let showDeleteConfirm = $state(false);
+	let showCopyDialog = $state(false);
 	let installingPrerequisites = $state(false);
 	async function handlePrerequisites() {
 		installingPrerequisites = true;
@@ -166,6 +169,9 @@
 		{/if}
 
 		{#if isReady}
+			<PopoverMenuItem onclick={() => (showCopyDialog = true)}>
+				<Copy size={16} />Copy instance
+			</PopoverMenuItem>
 			<PopoverMenuItem onclick={handleInstallMod} disabled={isSettingUp}>
 				<PackageOpen size={16} />
 				{m.instancemenu_install_mod()}
@@ -220,3 +226,5 @@
 	instanceName={instance.label}
 	onconfirm={handleDeleteConfirm}
 />
+
+<CopyInstanceDialog bind:open={showCopyDialog} {instance} />

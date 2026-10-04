@@ -9,12 +9,19 @@ import {
 	wineRuntime,
 } from "../stores/settings.svelte";
 import { createCommand, processArgs } from "./command";
-import { instanceHome, prepareIndependentInstances } from "./instance-storage.svelte";
+import {
+	instanceHome,
+	instanceStorage,
+	prepareIndependentInstances,
+} from "./instance-storage.svelte";
 import type { Instance } from "../types/instance";
 import type { Process } from "../types/process";
 
 export const launchGame = async (requestedInstance: Instance) => {
 	await prepareIndependentInstances();
+	if (instanceStorage.copying.includes(requestedInstance.id)) {
+		throw new Error("Wait for the instance copy to finish before launching it.");
+	}
 	const instance = instanceMap.value[requestedInstance.id] ?? requestedInstance;
 	const { path, launchOptions: options } = instance;
 	const platform = options.platform ?? "Win64";
