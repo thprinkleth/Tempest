@@ -45,7 +45,13 @@ try {
         Assert $result.Success 'Fixture mod installation failed'
     }
     $copy = Join-Path $sandbox 'Copy'
-    $result = (Invoke-Cli @('instance','clone',$original,'--output',$copy,'--from-home',$sourceHomeName,'--to-home',$targetHomeName)) | ConvertFrom-Json
+    $sourceCache = Join-Path $sandbox 'SourceCache'
+    $targetCache = Join-Path $sandbox 'TargetCache'
+    New-Item -ItemType Directory -Path $sourceCache | Out-Null
+    [IO.File]::WriteAllText((Join-Path $sourceCache 'assembly.db'), 'cached assembly')
+    $result = (Invoke-Cli @('instance','clone',$original,'--output',$copy,'--from-home',$sourceHomeName,'--to-home',$targetHomeName,'--from-cache',$sourceCache,'--to-cache',$targetCache)) | ConvertFrom-Json
+    [IO.File]::WriteAllText((Join-Path $sourceCache 'assembly.db'), 'updated assembly')
+    Assert ((Get-Content -LiteralPath (Join-Path $targetCache 'assembly.db') -Raw) -eq 'cached assembly') 'Copied instance cache was linked or missing'
     Assert ($result.Output -eq $copy) 'Clone returned wrong destination'
     Assert ((Get-Content -LiteralPath (Join-Path $targetHome 'settings.ini') -Raw) -eq 'same preferences') 'User settings were not copied'
     [IO.File]::WriteAllText((Join-Path $sourceHome 'settings.ini'), 'updated preferences')

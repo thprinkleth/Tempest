@@ -21,11 +21,14 @@ internal class InstanceCommands
     /// <param name="output">New destination folder; must not exist</param>
     /// <param name="fromHome">Optional source game user-data folder name</param>
     /// <param name="toHome">Optional new game user-data folder name</param>
-    public void Clone([Argument] string path, string output, string? fromHome = null, string? toHome = null)
+    /// <param name="fromCache">Optional source instance cache directory</param>
+    /// <param name="toCache">Optional new instance cache directory</param>
+    public void Clone([Argument] string path, string output, string? fromHome = null, string? toHome = null, string? fromCache = null, string? toCache = null)
     {
         string? stage = null;
         string? homeStage = null;
-        var committed = false;
+        string? cacheStage = null;
+        var committed = new List<string>();
         string? homeTarget = null;
         try
         {
@@ -56,25 +59,41 @@ internal class InstanceCommands
                 ValidateDestination(HomePath(fromHome), homeTarget);
                 homeStage = StageCopy(HomePath(fromHome), homeTarget, allowMissing: true);
             }
+            if (fromCache != null || toCache != null)
+            {
+                if (fromCache == null || toCache == null) throw new ArgumentException("Both cache directories are required.");
+                fromCache = Path.GetFullPath(fromCache);
+                toCache = Path.GetFullPath(toCache);
+                ValidateDestination(fromCache, toCache);
+                cacheStage = StageCopy(fromCache, toCache, allowMissing: true);
+            }
             Directory.Move(stage, output);
             stage = null;
-            committed = true;
+            committed.Add(output);
             if (homeStage != null)
             {
                 Directory.Move(homeStage, homeTarget!);
                 homeStage = null;
+                committed.Add(homeTarget!);
+            }
+            if (cacheStage != null)
+            {
+                Directory.Move(cacheStage, toCache!);
+                cacheStage = null;
+                committed.Add(toCache!);
             }
             Console.WriteLine(JsonSerializer.Serialize(new CloneResult(source, output), InstanceJsonContext.Default.CloneResult));
         }
         catch
         {
-            if (committed) DeleteOwnedTree(output);
+            foreach (var directory in committed.AsEnumerable().Reverse()) DeleteOwnedTree(directory);
             throw;
         }
         finally
         {
             if (stage != null) DeleteOwnedTree(stage);
             if (homeStage != null) DeleteOwnedTree(homeStage);
+            if (cacheStage != null) DeleteOwnedTree(cacheStage);
         }
     }
 

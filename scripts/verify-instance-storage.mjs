@@ -11,10 +11,11 @@ const require = createRequire(resolve(launcher, "package.json"));
 const ts = require("typescript");
 const { compileModule } = require("svelte/compiler");
 const fixture = resolve(launcher, ".svelte-kit", `verify-storage-${process.pid}.mjs`);
+const copyFixture = resolve(launcher, ".svelte-kit", `verify-copy-${process.pid}.mjs`);
 const source = await readFile(resolve(launcher, "src/lib/core/instance-storage.svelte.ts"), "utf8");
 const stripped = source.replace(/^import[\s\S]*?;\r?\n/gm, "");
 const javascript = ts.transpileModule(stripped, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
-const prefix = `const {join, homeDir, platform, createCommand, queueItems, queueRunning, instanceMap, updateInstance, processesList, defaultInstancePath, allowScopeDirectory} = globalThis.__storageTest;\n`;
+const prefix = `const {join, homeDir, platform, createCommand, queueItems, queueRunning, instanceMap, updateInstance, processesList, defaultInstancePath, allowScopeDirectory, getInstanceBasePath} = globalThis.__storageTest;\n`;
 const calls = [];
 const instanceMap = { value: {} };
 const queueItems = { value: [] };
@@ -23,6 +24,7 @@ let failClone = false;
 globalThis.__storageTest = {
 	join: async (...parts) => parts.join("/"), homeDir: async () => "C:/Users/test", platform: () => "windows",
 	allowScopeDirectory: async () => {},
+	getInstanceBasePath: async (id) => `C:/Config/instances/${id}`,
 	queueItems, queueRunning: { value: false }, instanceMap, processesList: { value: [] }, defaultInstancePath: { value: "C:/Games" },
 	updateInstance: (id, changes) => { instanceMap.value[id] = { ...instanceMap.value[id], ...changes }; },
 	createCommand: (args) => ({ execute: async () => {
@@ -63,7 +65,39 @@ try {
 	await service.prepareIndependentInstances();
 	assert.equal(service.instanceStorage.ready, true);
 	console.log("Instance storage: shared folders, executable aliases, home isolation, independent arguments, stale writes and failed-copy retry passed.");
+	const copySource = await readFile(resolve(launcher, "src/lib/core/instance-copy.ts"), "utf8");
+	const copyJs = ts.transpileModule(copySource.replace(/^import[\s\S]*?;\r?\n/gm, ""), { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
+	globalThis.__copyTest = { ...service, ...globalThis.__storageTest, instanceStorage: service.instanceStorage, addInstance: (instance) => { instanceMap.value[instance.id] = instance; } };
+	await writeFile(copyFixture, `const {cloneInstanceFiles, instanceStorage, prepareIndependentInstances, relocateLaunchOptions, addInstance, instanceMap, processesList, queueRunning, allowScopeDirectory} = globalThis.__copyTest;\n` + copyJs);
+	const { copyInstance } = await import(pathToFileURL(copyFixture));
+	instanceMap.value = { g: { ...make("g", "C:/Games/source"), color: "#123456", manifestId: "manifest", appId: 444, launchOptions: { ...make("g").launchOptions, noDefaultArgs: true, log: true, platform: "Win32" } } };
+	const copy = await copyInstance("g", "h", "My copy", "C:/Games/copy");
+	assert.equal(copy.version, instanceMap.value.g.version);
+	assert.equal(copy.color, instanceMap.value.g.color);
+	assert.equal(copy.manifestId, "manifest");
+	assert.equal(copy.appId, 444);
+	assert.equal(copy.launchOptions.platform, "Win32");
+	assert.equal(copy.launchOptions.noDefaultArgs, true);
+	assert.equal(copy.launchOptions.log, true);
+	assert.equal(copy.label, "My copy");
+	assert.equal(copy.userDataDir, "Tempest_h");
+	assert.deepEqual(copy.launchOptions.args, instanceMap.value.g.launchOptions.args);
+	assert.notEqual(copy.launchOptions.args, instanceMap.value.g.launchOptions.args);
+	assert.notEqual(copy.launchOptions.dllList, instanceMap.value.g.launchOptions.dllList);
+	const copyCall = calls.findLast((args) => args[1] === "clone");
+	assert.equal(copyCall[3]["--from-cache"], "C:/Config/instances/g");
+	assert.equal(copyCall[3]["--to-cache"], "C:/Config/instances/h");
+	globalThis.__storageTest.processesList.value = [{ instance: instanceMap.value.g }];
+	await assert.rejects(copyInstance("g", "i", "Running copy", "C:/Games/running"), /Close this instance/);
+	globalThis.__storageTest.processesList.value = [];
+	failClone = true;
+	await assert.rejects(copyInstance("g", "i", "Failed copy", "C:/Games/fail-copy"), /Disk full/);
+	assert.equal(instanceMap.value.i, undefined);
+	assert.deepEqual([...service.instanceStorage.copying], []);
+	console.log("Copy Instance: version, color, manifest, launch options, unique profile/cache, running-source refusal and failed-copy rollback passed.");
 } finally {
 	delete globalThis.__storageTest;
+	delete globalThis.__copyTest;
 	await rm(fixture, { force: true });
+	await rm(copyFixture, { force: true });
 }
