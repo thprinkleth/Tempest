@@ -11,7 +11,7 @@ type Registry = {
 	version: 1;
 	cleaned: boolean;
 	removedIds?: string[];
-	instances: Pick<Instance, "id" | "label" | "path" | "managedPath" | "origin">[];
+	instances: Pick<Instance, "id" | "label" | "path" | "managedPath" | "origin" | "userDataDir">[];
 };
 let writes = Promise.resolve();
 let cleaning = false;
@@ -32,13 +32,16 @@ export async function saveCleanupRegistry(instances: Instance[]): Promise<string
 	const snapshot: Registry = {
 		version: 1,
 		cleaned: false,
-		instances: instances.map(({ id, label, path: gamePath, managedPath, origin }) => ({
-			id,
-			label,
-			path: gamePath,
-			managedPath,
-			origin,
-		})),
+		instances: instances.map(
+			({ id, label, path: gamePath, managedPath, origin, userDataDir }) => ({
+				id,
+				label,
+				path: gamePath,
+				managedPath,
+				origin,
+				userDataDir,
+			}),
+		),
 	};
 	const write = writes.then(async () => {
 		await mkdir(config, { recursive: true });

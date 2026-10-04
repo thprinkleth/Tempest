@@ -1,4 +1,4 @@
-import { lastLaunchedInstanceId } from "../stores/instance.svelte";
+import { instanceMap, lastLaunchedInstanceId } from "../stores/instance.svelte";
 import { appendProcessLog, logCommandOutput, processesList } from "../stores/processes.svelte";
 import {
 	gamescopeArgs,
@@ -9,10 +9,13 @@ import {
 	wineRuntime,
 } from "../stores/settings.svelte";
 import { createCommand, processArgs } from "./command";
+import { instanceHome, prepareIndependentInstances } from "./instance-storage.svelte";
 import type { Instance } from "../types/instance";
 import type { Process } from "../types/process";
 
-export const launchGame = async (instance: Instance) => {
+export const launchGame = async (requestedInstance: Instance) => {
+	await prepareIndependentInstances();
+	const instance = instanceMap.value[requestedInstance.id] ?? requestedInstance;
 	const { path, launchOptions: options } = instance;
 	const platform = options.platform ?? "Win64";
 
@@ -45,15 +48,7 @@ export const launchGame = async (instance: Instance) => {
 			{ "--gamescope": useGamescope.get() },
 			{ "--gamescope-args": gamescopeArgs.get() || undefined },
 			{ "--steam-runtime": useSteamRuntime.get() || undefined },
-			{
-				"--homedir":
-					instance.version === "8.1"
-						? "Paladins"
-						: `${instance.version ? `${instance.version}_` : ""}${instance.label}`.replaceAll(
-								/[^a-zA-Z0-9-_]/g,
-								"_",
-							),
-			},
+			{ "--homedir": instanceHome(instance) },
 			...(options.dllList ? options.dllList.map((dll) => ({ "--dll": dll })) : []),
 			...(options.args ? ["--", ...processArgs(options.args)] : []),
 		],

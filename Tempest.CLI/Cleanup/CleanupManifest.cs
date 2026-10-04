@@ -17,6 +17,7 @@ internal sealed class CleanupInstance
     public string Path { get; set; } = "";
     public string? ManagedPath { get; set; }
     public string? Origin { get; set; }
+    public string? UserDataDir { get; set; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]

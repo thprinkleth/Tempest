@@ -5,12 +5,11 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { getQueryClient } from "$lib/queries/client";
 import { appendProcessLogs } from "$lib/stores/processes.svelte";
 import { createCommand } from "./command";
+import { assertIndependentPath } from "./instance-storage.svelte";
 import type { Instance } from "$lib/types/instance";
 
 const REMOTE_CORE_URL =
 	"https://github.com/LowRezStudio/TgMod/releases/download/1.0.0/Tempest.Core.Tempest";
-const LATEST_CORE_API = "https://api.github.com/repos/LowRezStudio/TgMod/releases/latest";
-const CORE_VERSION_KEY = "tempest_core_remote_version";
 
 async function downloadRemoteMod(url: string, filename: string): Promise<string> {
 	const tmp = await tempDir();
@@ -112,66 +111,6 @@ export const installAutoMods = async (instance: Instance): Promise<void> => {
 	void getQueryClient()?.invalidateQueries({ queryKey: ["mods", gamePath] });
 };
 
-export const checkForCoreUpdatesAndInstall = async (instances: Instance[]): Promise<void> => {
-	try {
-		const res = await tauriFetch(LATEST_CORE_API, {
-			method: "GET",
-			headers: { Accept: "application/vnd.github+json" },
-		});
-		if (!res.ok) return;
-		const data = await res.json();
-		const tag: string = data.tag_name;
-		if (!tag) return;
-		const stored = localStorage.getItem(CORE_VERSION_KEY);
-		// If we've already applied this tag, skip
-		if (stored === tag) return;
-		const asset =
-			(data.assets as Array<{ name: string; browser_download_url: string }>)?.find(
-				(a) => a.name === "Tempest.Core.Tempest",
-			) ??
-			(data.assets as Array<{ name: string; browser_download_url: string }>)?.find(
-				(a) => a.name === "Tempest Core.tempest",
-			) ??
-			(data.assets as Array<{ name: string; browser_download_url: string }>)?.[0];
-		if (!asset?.browser_download_url) return;
-		const url = asset.browser_download_url;
-		appendProcessLogs([`New Tempest Core ${tag} found, downloading...`], false, "mods");
-		const modFile = await downloadRemoteMod(url, "Tempest.Core.Tempest");
-		// Verify corresponding builds: only Core versions (0.56/0.57) get the update
-		const coreInstances = instances.filter(
-			(i) => i.version && CORE_MOD_VERSIONS.has(i.version),
-		);
-		if (coreInstances.length === 0) {
-			localStorage.setItem(CORE_VERSION_KEY, tag);
-			return;
-		}
-		for (const inst of coreInstances) {
-			try {
-				appendProcessLogs(
-					[`Updating ${inst.label} (${inst.version}) to Core ${tag}`],
-					false,
-					"mods",
-				);
-				await installMod(inst.path, modFile, true, true);
-			} catch (e) {
-				console.error(`Failed to update ${inst.label}:`, e);
-			}
-		}
-		localStorage.setItem(CORE_VERSION_KEY, tag);
-		appendProcessLogs(
-			[`Tempest Core updated to ${tag} for ${coreInstances.length} instance(s)`],
-			false,
-			"mods",
-		);
-		// Also refresh mod caches
-		for (const inst of coreInstances) {
-			void getQueryClient()?.invalidateQueries({ queryKey: ["mods", inst.path] });
-		}
-	} catch (e) {
-		console.error("Core update check failed:", e);
-	}
-};
-
 export const listMods = async (gamePath: string): Promise<ModRecord[]> => {
 	const args = ["mod", "list", gamePath, "--json"];
 	appendProcessLogs([`Running command: tempest-cli ${args.join(" ")}`], false, "mods");
@@ -201,6 +140,7 @@ export const installMod = async (
 	allowUnsigned = false,
 	stack = false,
 ): Promise<ModInstallResult> => {
+	await assertIndependentPath(gamePath);
 	const args = ["mod", "install", gamePath, modFile];
 	if (replace) args.push("--replace");
 	if (stack) args.push("--stack");
@@ -226,6 +166,7 @@ export const installMod = async (
 };
 
 export const removeMod = async (gamePath: string, modName: string): Promise<ModInstallResult> => {
+	await assertIndependentPath(gamePath);
 	const args = ["mod", "remove", gamePath, modName, "--json"];
 	appendProcessLogs([`Running command: tempest-cli ${args.join(" ")}`], false, "mods");
 	const res = await createCommand(args).execute();
@@ -250,6 +191,7 @@ export const renameMod = async (
 	oldName: string,
 	newName: string,
 ): Promise<ModInstallResult> => {
+	await assertIndependentPath(gamePath);
 	const args = ["mod", "rename", gamePath, oldName, newName, "--json"];
 	appendProcessLogs([`Running command: tempest-cli ${args.join(" ")}`], false, "mods");
 	const res = await createCommand(args).execute();
@@ -270,6 +212,7 @@ export const renameMod = async (
 };
 
 export const enableMod = async (gamePath: string, modName: string): Promise<ModInstallResult> => {
+	await assertIndependentPath(gamePath);
 	const args = ["mod", "enable", gamePath, modName, "--json"];
 	appendProcessLogs([`Running command: tempest-cli ${args.join(" ")}`], false, "mods");
 	const res = await createCommand(args).execute();
@@ -290,6 +233,7 @@ export const enableMod = async (gamePath: string, modName: string): Promise<ModI
 };
 
 export const disableMod = async (gamePath: string, modName: string): Promise<ModInstallResult> => {
+	await assertIndependentPath(gamePath);
 	const args = ["mod", "disable", gamePath, modName, "--json"];
 	appendProcessLogs([`Running command: tempest-cli ${args.join(" ")}`], false, "mods");
 	const res = await createCommand(args).execute();

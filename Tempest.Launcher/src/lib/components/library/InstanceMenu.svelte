@@ -17,6 +17,7 @@
 	import PopoverMenu from "$lib/components/ui/PopoverMenu.svelte";
 	import PopoverMenuItem from "$lib/components/ui/PopoverMenuItem.svelte";
 	import { deleteInstance } from "$lib/core/instance-delete";
+	import { assertIndependentPath } from "$lib/core/instance-storage.svelte";
 	import { installPrerequisites } from "$lib/core/prerequisites";
 	import versions from "$lib/data/versions.json";
 	import { useInstallMods } from "$lib/mods/useInstallMods";
@@ -109,8 +110,18 @@
 		}
 	}
 
-	function handleRestore() {
+	async function handleRestore() {
 		if (!instance?.path || !canRestore || isSettingUp) return;
+		try {
+			await assertIndependentPath(instance.path);
+		} catch (error) {
+			addToast({
+				title: "Instance preparation failed",
+				message: String(error),
+				tone: "error",
+			});
+			return;
+		}
 
 		const manifestId =
 			instance.manifestId ?? versions.find((i) => i.version === instance.version)?.id;

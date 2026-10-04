@@ -6,16 +6,19 @@
 	import { page } from "$app/state";
 	import { QueryClient, QueryClientProvider } from "@tanstack/svelte-query";
 	import { Tooltip } from "bits-ui";
-	import { onDestroy } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 	import favicon from "$lib/assets/favicon.ico?url";
 	import AppShell from "$lib/components/layout/AppShell.svelte";
 	import OnboardingPage from "$lib/components/onboarding/OnboardingPage.svelte";
-	import { checkForCoreUpdatesAndInstall } from "$lib/core/mods";
+	import Modal from "$lib/components/ui/Modal.svelte";
+	import {
+		instanceStorage,
+		prepareIndependentInstances,
+	} from "$lib/core/instance-storage.svelte";
 	import { cleanupRegistryState, initializeCleanupRegistry } from "$lib/core/uninstall.svelte";
 	import { setQueryClient } from "$lib/queries/client";
 	import { instanceMap } from "$lib/stores/instance.svelte";
 	import { updaterStore } from "$lib/stores/updater.svelte";
-	import type { Instance } from "$lib/types/instance";
 
 	const { children } = $props();
 	onDestroy(initializeCleanupRegistry());
@@ -30,20 +33,13 @@
 		updaterStore.checkForUpdates(true);
 	});
 
-	let coreUpdateChecked = false;
 	$effect(() => {
 		if (!cleanupRegistryState.ready) return;
-		if (coreUpdateChecked) return;
-		const instances = Object.values(instanceMap.value).filter(Boolean) as Instance[];
-		// Wait until instances are loaded (at least one) before checking - also runs if zero but we still want to record version
-		if (
-			!coreUpdateChecked &&
-			instances.length === 0 &&
-			Object.keys(instanceMap.value).length === 0
-		)
-			return;
-		coreUpdateChecked = true;
-		void checkForCoreUpdatesAndInstall(instances);
+		// Track only storage changes; never update mods across the library at startup.
+		JSON.stringify(
+			Object.values(instanceMap.value).map((i) => i && [i.id, i.path, i.userDataDir]),
+		);
+		untrack(() => void prepareIndependentInstances().catch(() => {}));
 	});
 
 	// Once per launch: route through onboarding when no game instances exist yet.
@@ -62,11 +58,35 @@
 
 <QueryClientProvider client={queryClient}>
 	<Tooltip.Provider delayDuration={400}>
+		{#if instanceStorage.error}
+			<div class="alert alert-error" role="alert">
+				<span>{instanceStorage.error}</span>
+				<button
+					class="btn btn-sm"
+					onclick={() => void prepareIndependentInstances().catch(() => {})}
+					>Retry instance preparation</button
+				>
+			</div>
+		{/if}
 		{#if inOnboarding}
 			<!-- Full-screen first-run experience; finishing navigates back to "/". -->
 			<OnboardingPage />
 		{:else}
 			<AppShell {children} />
 		{/if}
+		<Modal
+			open={instanceStorage.busy}
+			title="Preparing independent instances"
+			dismissible={false}
+		>
+			<div class="flex items-center gap-3">
+				<span class="loading loading-spinner loading-sm"></span>
+				<p>{instanceStorage.label || "Checking game folders…"}</p>
+			</div>
+			<p class="mt-3 text-sm opacity-70">
+				Shared folders are copied so each instance has its own mods and settings. This may
+				take a while.
+			</p>
+		</Modal>
 	</Tooltip.Provider>
 </QueryClientProvider>

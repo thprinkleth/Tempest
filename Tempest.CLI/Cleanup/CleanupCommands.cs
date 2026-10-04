@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using ConsoleAppFramework;
 using Tempest.CLI.Mods;
+using Tempest.CLI.Instances;
 
 namespace Tempest.CLI.Cleanup;
 
@@ -35,6 +36,7 @@ internal class CleanupCommands
             {
                 if (!Guid.TryParse(instance.Id, out _)) throw new InvalidDataException("Invalid instance ID.");
                 ValidateRoot(instance.Path);
+                ValidateHome(instance);
             }
             if (interactive && OperatingSystem.IsWindows())
             {
@@ -87,6 +89,8 @@ internal class CleanupCommands
                 }
                 foreach (var instance in group)
                 {
+                    var home = ValidateHome(instance);
+                    if (home != null && Directory.Exists(home)) Directory.Delete(home, recursive: true);
                     var cache = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(manifest)!, "instances", instance.Id);
                     EnsureNoLinks(cache, recursive: true);
                     if (Directory.Exists(cache)) Directory.Delete(cache, recursive: true);
@@ -109,6 +113,14 @@ internal class CleanupCommands
     }
 
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+    private static string? ValidateHome(CleanupInstance instance)
+    {
+        if (instance.UserDataDir == null) return null;
+        if (instance.UserDataDir != "Tempest_" + instance.Id) throw new InvalidDataException("Invalid instance user-data folder.");
+        var home = InstanceCommands.HomePath(instance.UserDataDir);
+        EnsureNoLinks(home, recursive: true);
+        return home;
+    }
     private static bool DeleteGame(IEnumerable<CleanupInstance> instances) =>
         instances.All(i => i.Origin != "import" && i.ManagedPath != null && PathComparer.Equals(ResolveRoot(i.Path), System.IO.Path.GetFullPath(i.ManagedPath).TrimEnd(System.IO.Path.DirectorySeparatorChar)));
 
