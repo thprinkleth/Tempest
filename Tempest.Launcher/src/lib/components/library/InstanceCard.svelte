@@ -56,6 +56,7 @@
 	function handleCardClick(e: MouseEvent) {
 		const target = e.target as Element;
 		if (
+			target.closest("button, a") ||
 			target.closest("[data-bits-popover-trigger]") ||
 			target.closest("[data-bits-popover-content]") ||
 			target.closest("dialog") ||

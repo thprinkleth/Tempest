@@ -408,9 +408,9 @@
 		>
 			<GripHorizontal size={14} />
 		</button>
-		<div class="join items-center gap-1 shadow-none">
+		<div class="flex items-center gap-2 shadow-none">
 			<button
-				class="btn btn-lg join-item min-h-14 gap-2"
+				class="btn btn-lg min-h-14 gap-2"
 				class:btn-accent={!isRunning}
 				class:btn-error={isRunning}
 				disabled={isLaunching || isKilling}
@@ -442,7 +442,7 @@
 			</button>
 			<InstanceSessionControls instance={currentInstance} busy={isLaunching || isKilling} />
 
-			<a href={`/instance/${currentInstance.id}`} class="btn btn-lg join-item min-h-14">
+			<a href={`/instance/${currentInstance.id}`} class="btn btn-lg min-h-14">
 				<Box size={20} />
 			</a>
 		</div>
