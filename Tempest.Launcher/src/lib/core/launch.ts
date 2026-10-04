@@ -9,7 +9,7 @@ import {
 	wineRuntime,
 } from "../stores/settings.svelte";
 import { createCommand, processArgs } from "./command";
-import { instanceHome, prepareIndependentInstances } from "./instance-storage.svelte";
+import { prepareIndependentInstances } from "./instance-storage.svelte";
 import type { Instance } from "../types/instance";
 import type { Process } from "../types/process";
 
@@ -18,17 +18,15 @@ export const launchGame = async (requestedInstance: Instance) => {
 	const instance = instanceMap.value[requestedInstance.id] ?? requestedInstance;
 	const { path, launchOptions: options } = instance;
 	const platform = options.platform ?? "Win64";
+	const args = processArgs(options.args ?? []);
+	const hasHomeDir = args.some((arg) => /^-homedir(?:=|$)/i.test(arg));
 
 	lastLaunchedInstanceId.value = instance.id;
 
 	console.log("Launching instance", instance.id, instance.version);
 	console.log(instance);
 
-	appendProcessLog(
-		`Launching game client with args: ${processArgs(options.args ?? []).join(" ")}`,
-		false,
-		"launch",
-	);
+	appendProcessLog(`Launching game client with args: ${args.join(" ")}`, false, "launch");
 
 	const wine = winePath.get();
 	const runtime = wineRuntime.get();
@@ -48,9 +46,9 @@ export const launchGame = async (requestedInstance: Instance) => {
 			{ "--gamescope": useGamescope.get() },
 			{ "--gamescope-args": gamescopeArgs.get() || undefined },
 			{ "--steam-runtime": useSteamRuntime.get() || undefined },
-			{ "--homedir": instanceHome(instance) },
+			{ "--homedir": hasHomeDir ? undefined : "Paladins" },
 			...(options.dllList ? options.dllList.map((dll) => ({ "--dll": dll })) : []),
-			...(options.args ? ["--", ...processArgs(options.args)] : []),
+			...(args.length ? ["--", ...args] : []),
 		],
 		env,
 	);

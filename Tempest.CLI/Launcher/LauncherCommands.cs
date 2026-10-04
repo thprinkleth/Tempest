@@ -56,6 +56,8 @@ public static async Task<Process> LaunchGame(string path, string[] args, bool no
 
         var exePath = LauncherUtility.GetExecutablePath(path, platform, game);
         var defaultArgs = !noDefaultArgs;
+        var hasHomeDir = args.Any(arg => arg.Equals("-homedir", StringComparison.OrdinalIgnoreCase)
+            || arg.StartsWith("-homedir=", StringComparison.OrdinalIgnoreCase));
         var is64Bit = Directory.GetParent(exePath)?.Name == "Win64";
 
         // Rename EasyAntiCheat folders to prevent crash when loading anti-cheat with Wine
@@ -95,7 +97,7 @@ public static async Task<Process> LaunchGame(string path, string[] args, bool no
         for (var index = 0; index < args.Length; index++)
         {
             var arg = args[index];
-            // Instance-owned user data must also be respected with custom launch arguments.
+            // An explicit CLI home directory overrides passthrough game arguments.
             if (homedir != null && arg.StartsWith("-homedir=", StringComparison.OrdinalIgnoreCase)) continue;
             if (homedir != null && arg.Equals("-homedir", StringComparison.OrdinalIgnoreCase))
             {
@@ -119,7 +121,7 @@ public static async Task<Process> LaunchGame(string path, string[] args, bool no
             }
         }
 
-        if (defaultArgs || homedir != null)
+        if ((defaultArgs && !hasHomeDir) || homedir != null)
             process.StartInfo.ArgumentList.Add($"-homedir={homedir ?? "Tempest"}");
 
         if (gamescope)

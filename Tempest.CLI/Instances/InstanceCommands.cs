@@ -19,14 +19,10 @@ internal class InstanceCommands
     /// <summary>Copies game files, installed mods and backups into an independent instance</summary>
     /// <param name="path">Source instance folder</param>
     /// <param name="output">New destination folder; must not exist</param>
-    /// <param name="fromHome">Optional source game user-data folder name</param>
-    /// <param name="toHome">Optional new game user-data folder name</param>
-    public void Clone([Argument] string path, string output, string? fromHome = null, string? toHome = null)
+    public void Clone([Argument] string path, string output)
     {
         string? stage = null;
-        string? homeStage = null;
         var committed = false;
-        string? homeTarget = null;
         try
         {
             var source = GameFolderResolver.Resolve(Path.GetFullPath(path)).TrimEnd(Path.DirectorySeparatorChar);
@@ -49,21 +45,9 @@ internal class InstanceCommands
             stage = StageCopy(source, output);
             if (File.Exists(metadata))
                 File.WriteAllText(Path.Combine(stage, ".tempest", "mods", "mods.json"), JsonSerializer.Serialize(mods, ModSourceGenerationContext.Default.ListModRecord));
-            if (fromHome != null || toHome != null)
-            {
-                if (fromHome == null || toHome == null) throw new ArgumentException("Both user-data folder names are required.");
-                homeTarget = HomePath(toHome);
-                ValidateDestination(HomePath(fromHome), homeTarget);
-                homeStage = StageCopy(HomePath(fromHome), homeTarget, allowMissing: true);
-            }
             Directory.Move(stage, output);
             stage = null;
             committed = true;
-            if (homeStage != null)
-            {
-                Directory.Move(homeStage, homeTarget!);
-                homeStage = null;
-            }
             Console.WriteLine(JsonSerializer.Serialize(new CloneResult(source, output), InstanceJsonContext.Default.CloneResult));
         }
         catch
@@ -74,20 +58,7 @@ internal class InstanceCommands
         finally
         {
             if (stage != null) DeleteOwnedTree(stage);
-            if (homeStage != null) DeleteOwnedTree(homeStage);
         }
-    }
-
-    /// <summary>Seeds a unique instance user-data folder without changing the original</summary>
-    public void PrepareHome(string from, string name)
-    {
-        var target = HomePath(name);
-        if (Directory.Exists(target)) return;
-        var source = HomePath(from);
-        ValidateDestination(source, target);
-        var stage = StageCopy(source, target, allowMissing: true);
-        try { Directory.Move(stage, target); }
-        finally { if (Directory.Exists(stage)) DeleteOwnedTree(stage); }
     }
 
     internal static string ResolveRoot(string path)
@@ -125,16 +96,15 @@ internal class InstanceCommands
         NoLinks(target);
     }
 
-    private static string StageCopy(string source, string target, bool allowMissing = false)
+    private static string StageCopy(string source, string target)
     {
-        if (!Directory.Exists(source) && !allowMissing) throw new DirectoryNotFoundException("Source instance not found.");
+        if (!Directory.Exists(source)) throw new DirectoryNotFoundException("Source instance not found.");
         var parent = Path.GetDirectoryName(target) ?? throw new IOException("Invalid destination folder.");
         Directory.CreateDirectory(parent);
         var stage = target + ".copy-" + Guid.NewGuid().ToString("N");
         Directory.CreateDirectory(stage);
         try
         {
-            if (!Directory.Exists(source)) return stage;
             CopyDirectory(source, stage);
             return stage;
         }
