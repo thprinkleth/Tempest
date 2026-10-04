@@ -2,12 +2,13 @@
 	import { goto } from "$app/navigation";
 	import { Gamepad2, Play, Square, Trash2 } from "@lucide/svelte";
 	import DeleteInstanceDialog from "$lib/components/library/DeleteInstanceDialog.svelte";
+	import InstanceSessionControls from "$lib/components/library/InstanceSessionControls.svelte";
 	import PaladinsIcon from "$lib/components/ui/PaladinsIcon.svelte";
 	import { deleteInstance } from "$lib/core/instance-delete";
 	import { m } from "$lib/paraglide/messages";
 	import { createLaunchGameMutation, createKillGameMutation } from "$lib/queries/core";
 	import { queueItems } from "$lib/rigby/stores.svelte";
-	import { processesList } from "$lib/stores/processes.svelte";
+	import { launchingInstanceIds, processesList } from "$lib/stores/processes.svelte";
 	import { getContrastColor, getInstanceColor } from "$lib/utils/color";
 	import InstanceMenu from "./InstanceMenu.svelte";
 	import type { Instance } from "$lib/types/instance";
@@ -37,7 +38,9 @@
 
 	const launchMutation = createLaunchGameMutation();
 	const killMutation = createKillGameMutation();
-	let isLaunching = $derived(launchMutation.isPending);
+	let isLaunching = $derived(
+		launchMutation.isPending || launchingInstanceIds.value.includes(instance.id),
+	);
 	let isKilling = $derived(killMutation.isPending);
 	let isBusy = $derived(isLaunching || isKilling);
 
@@ -163,7 +166,8 @@
 			<div class="flex items-center gap-1">
 				<button
 					class="btn btn-sm btn-square btn-ghost"
-					disabled={isBusy}
+					disabled={isBusy || isSettingUp}
+					title={isRunning ? "Stop all sessions of this instance" : "Play"}
 					onclick={(e) => {
 						e.stopPropagation();
 						if (isRunning) {
@@ -181,8 +185,10 @@
 						<Play size={14} />
 					{/if}
 				</button>
+				<InstanceSessionControls {instance} busy={isBusy} />
 				<button
 					class="btn btn-sm btn-square btn-ghost hover:text-error delete-instance-btn"
+					disabled={isRunning || isBusy}
 					onclick={(e) => {
 						e.stopPropagation();
 						showDeleteConfirm = true;

@@ -15,7 +15,7 @@ const copyFixture = resolve(launcher, ".svelte-kit", `verify-copy-${process.pid}
 const source = await readFile(resolve(launcher, "src/lib/core/instance-storage.svelte.ts"), "utf8");
 const stripped = source.replace(/^import[\s\S]*?;\r?\n/gm, "");
 const javascript = ts.transpileModule(stripped, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
-const prefix = `const {join, homeDir, platform, createCommand, queueItems, queueRunning, instanceMap, updateInstance, processesList, defaultInstancePath, allowScopeDirectory, getInstanceBasePath} = globalThis.__storageTest;\n`;
+const prefix = `const {join, homeDir, platform, createCommand, queueItems, queueRunning, instanceMap, updateInstance, processesList, launchingInstanceIds, defaultInstancePath, allowScopeDirectory, getInstanceBasePath} = globalThis.__storageTest;\n`;
 const calls = [];
 const instanceMap = { value: {} };
 const queueItems = { value: [] };
@@ -25,6 +25,7 @@ globalThis.__storageTest = {
 	join: async (...parts) => parts.join("/"), homeDir: async () => "C:/Users/test", platform: () => "windows",
 	allowScopeDirectory: async () => {},
 	getInstanceBasePath: async (id) => `C:/Config/instances/${id}`,
+	launchingInstanceIds: { value: [] },
 	queueItems, queueRunning: { value: false }, instanceMap, processesList: { value: [] }, defaultInstancePath: { value: "C:/Games" },
 	updateInstance: (id, changes) => { instanceMap.value[id] = { ...instanceMap.value[id], ...changes }; },
 	createCommand: (args) => ({ execute: async () => {
@@ -68,7 +69,7 @@ try {
 	const copySource = await readFile(resolve(launcher, "src/lib/core/instance-copy.ts"), "utf8");
 	const copyJs = ts.transpileModule(copySource.replace(/^import[\s\S]*?;\r?\n/gm, ""), { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
 	globalThis.__copyTest = { ...service, ...globalThis.__storageTest, instanceStorage: service.instanceStorage, addInstance: (instance) => { instanceMap.value[instance.id] = instance; } };
-	await writeFile(copyFixture, `const {cloneInstanceFiles, instanceStorage, prepareIndependentInstances, relocateLaunchOptions, addInstance, instanceMap, processesList, queueRunning, allowScopeDirectory} = globalThis.__copyTest;\n` + copyJs);
+	await writeFile(copyFixture, `const {cloneInstanceFiles, instanceStorage, prepareIndependentInstances, relocateLaunchOptions, addInstance, instanceMap, processesList, launchingInstanceIds, queueRunning, allowScopeDirectory} = globalThis.__copyTest;\n` + copyJs);
 	const { copyInstance } = await import(pathToFileURL(copyFixture));
 	instanceMap.value = { g: { ...make("g", "C:/Games/source"), color: "#123456", manifestId: "manifest", appId: 444, launchOptions: { ...make("g").launchOptions, noDefaultArgs: true, log: true, platform: "Win32" } } };
 	const copy = await copyInstance("g", "h", "My copy", "C:/Games/copy");

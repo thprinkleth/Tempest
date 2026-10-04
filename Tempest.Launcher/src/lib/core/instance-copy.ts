@@ -6,7 +6,7 @@ import {
 } from "$lib/core/instance-storage.svelte";
 import { queueRunning } from "$lib/rigby/stores.svelte";
 import { addInstance, instanceMap } from "$lib/stores/instance.svelte";
-import { processesList } from "$lib/stores/processes.svelte";
+import { launchingInstanceIds, processesList } from "$lib/stores/processes.svelte";
 import { allowScopeDirectory } from "$lib/tauri/scopes";
 import type { Instance } from "$lib/types/instance";
 
@@ -27,6 +27,7 @@ export async function copyInstance(
 	}
 	if (
 		queueRunning.value ||
+		launchingInstanceIds.value.includes(sourceId) ||
 		processesList.value.some((p) => p.instance.id === sourceId) ||
 		instanceStorage.copying.includes(sourceId)
 	) {
