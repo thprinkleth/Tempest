@@ -32,6 +32,7 @@
 	} from "$lib/rigby/constants";
 	import { restoreQueue } from "$lib/rigby/restore-queue";
 	import { updateInstance } from "$lib/stores/instance.svelte";
+	import { launchingInstanceIds, processesList } from "$lib/stores/processes.svelte";
 	import { addToast } from "$lib/stores/ui.svelte";
 	import type { Instance } from "$lib/types/instance";
 	import type { Snippet } from "svelte";
@@ -78,6 +79,10 @@
 
 	let isSettingUp = $derived(instance.state.type === "setup");
 	let isReady = $derived(instance.state.type === "prepared");
+	let isRunning = $derived(
+		launchingInstanceIds.value.includes(instance.id) ||
+			processesList.value.some((p) => p.instance.id === instance.id),
+	);
 	let canRestore = $derived(!!((instance?.version || instance?.manifestId) && instance?.path));
 	let isOnInstancePage = $derived(page.route.id === "/instance/[id]");
 
@@ -169,10 +174,10 @@
 		{/if}
 
 		{#if isReady}
-			<PopoverMenuItem onclick={() => (showCopyDialog = true)}>
+			<PopoverMenuItem onclick={() => (showCopyDialog = true)} disabled={isRunning}>
 				<Copy size={16} />Copy instance
 			</PopoverMenuItem>
-			<PopoverMenuItem onclick={handleInstallMod} disabled={isSettingUp}>
+			<PopoverMenuItem onclick={handleInstallMod} disabled={isSettingUp || isRunning}>
 				<PackageOpen size={16} />
 				{m.instancemenu_install_mod()}
 			</PopoverMenuItem>
@@ -202,19 +207,23 @@
 					Install game prerequisites
 				</PopoverMenuItem>
 			{/if}
-			<PopoverMenuItem onclick={handleRunSetup} disabled={isSettingUp}>
+			<PopoverMenuItem onclick={handleRunSetup} disabled={isSettingUp || isRunning}>
 				<RefreshCw size={16} />
 				{m.instancemenu_run_setup()}
 			</PopoverMenuItem>
 			{#if canRestore}
-				<PopoverMenuItem onclick={handleRestore} disabled={isSettingUp}>
+				<PopoverMenuItem onclick={handleRestore} disabled={isSettingUp || isRunning}>
 					<RotateCcw size={16} />
 					{m.instancemenu_verify()}
 				</PopoverMenuItem>
 			{/if}
 		{/if}
 
-		<PopoverMenuItem onclick={() => (showDeleteConfirm = true)} class="text-error">
+		<PopoverMenuItem
+			onclick={() => (showDeleteConfirm = true)}
+			class="text-error"
+			disabled={isRunning}
+		>
 			<Trash2 size={16} />
 			{m.instancemenu_delete_instance()}
 		</PopoverMenuItem>

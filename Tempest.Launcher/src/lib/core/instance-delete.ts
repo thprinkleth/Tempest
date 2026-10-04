@@ -3,6 +3,7 @@ import { assertIndependentPath } from "$lib/core/instance-storage.svelte";
 import { listMods, removeMod } from "$lib/core/mods";
 import { restoreQueue } from "$lib/rigby/restore-queue";
 import { removeInstance } from "$lib/stores/instance.svelte";
+import { launchingInstanceIds, processesList } from "$lib/stores/processes.svelte";
 import type { Instance } from "$lib/types/instance";
 
 export type DeleteMode = "library" | "library_mods" | "delete";
@@ -18,6 +19,12 @@ export async function deleteInstance(
 				? "delete"
 				: "library"
 			: deleteDataOrMode;
+	if (
+		launchingInstanceIds.value.includes(instance.id) ||
+		processesList.value.some((p) => p.instance.id === instance.id)
+	) {
+		throw new Error("Close all sessions of this instance before removing it.");
+	}
 	if (mode !== "library" && instance.path) await assertIndependentPath(instance.path);
 
 	const isActive = instance.state.type === "downloading" || instance.state.type === "paused";

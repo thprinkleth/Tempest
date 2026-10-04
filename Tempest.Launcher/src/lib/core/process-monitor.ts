@@ -26,12 +26,12 @@ async function reconcileProcesses(): Promise<void> {
 			}),
 		);
 
-		const stoppedPids = new Set(
-			snapshot.filter((_, index) => !states[index]).map((process) => process.child.pid),
+		const stoppedSessions = new Set(
+			snapshot.filter((_, index) => !states[index]).map((process) => process.sessionId),
 		);
-		if (stoppedPids.size > 0) {
+		if (stoppedSessions.size > 0) {
 			processesList.value = processesList.value.filter(
-				(process) => !stoppedPids.has(process.child.pid),
+				(process) => !stoppedSessions.has(process.sessionId),
 			);
 		}
 	} finally {

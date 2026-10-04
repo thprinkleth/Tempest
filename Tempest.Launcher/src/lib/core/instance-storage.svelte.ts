@@ -4,7 +4,7 @@ import { createCommand } from "$lib/core/command";
 import { getInstanceBasePath } from "$lib/core/paths";
 import { queueItems, queueRunning } from "$lib/rigby/stores.svelte";
 import { instanceMap, updateInstance } from "$lib/stores/instance.svelte";
-import { processesList } from "$lib/stores/processes.svelte";
+import { launchingInstanceIds, processesList } from "$lib/stores/processes.svelte";
 import { defaultInstancePath } from "$lib/stores/settings.svelte";
 import { allowScopeDirectory } from "$lib/tauri/scopes";
 import type { Instance, InstanceLaunchOptions } from "$lib/types/instance";
@@ -203,6 +203,15 @@ export async function assertIndependentPath(gamePath: string): Promise<void> {
 		.filter((i): i is Instance => !!i && normalized(i.path) === normalized(gamePath))
 		.map((i) => i.id);
 	await prepareIndependentInstances();
+	if (
+		before.some(
+			(id) =>
+				launchingInstanceIds.value.includes(id) ||
+				processesList.value.some((p) => p.instance.id === id),
+		)
+	) {
+		throw new Error("Close all sessions of this instance before changing its files.");
+	}
 	if (before.some((id) => instanceStorage.copying.includes(id))) {
 		throw new Error("Wait for the instance copy to finish before changing its files.");
 	}
