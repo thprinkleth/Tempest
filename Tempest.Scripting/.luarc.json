@@ -1,0 +1,6 @@
+{
+  "runtime.version": "LuaJIT",
+  "workspace.library": ["types"],
+  "workspace.checkThirdParty": false,
+  "diagnostics.globals": ["MOD", "shared"]
+}

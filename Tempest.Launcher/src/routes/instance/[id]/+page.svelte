@@ -67,7 +67,10 @@
 	});
 
 	// Check if this instance is currently running
-	let isRunning = $derived(processesList.value.some((p) => p.instance?.id === instance?.id));
+	let windowCount = $derived(
+		processesList.value.filter((p) => p.instance?.id === instance?.id).length,
+	);
+	let isRunning = $derived(windowCount > 0);
 	const launchGameMutation = createLaunchGameMutation();
 	const killGameMutation = createKillGameMutation();
 	let isLaunching = $derived(
@@ -147,7 +150,7 @@
 					{m.common_stopping_label()}
 				{:else if isRunning}
 					<Square size={16} />
-					Stop all
+					{windowCount > 1 ? m.sessions_stop_all() : m.common_stop()}
 				{:else}
 					<Play size={16} />
 					{m.common_play()}

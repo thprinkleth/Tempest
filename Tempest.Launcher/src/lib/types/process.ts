@@ -5,6 +5,7 @@ import type { Child, Command } from "@tauri-apps/plugin-shell";
 export type Process = {
 	status: "on" | "setup" | "off" | "stopping";
 	sessionId: string;
+	/** Window number within its instance, stable while other windows close. */
 	sessionNumber: number;
 	startedAt: number;
 	child: Child;
